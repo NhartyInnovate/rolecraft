@@ -1,0 +1,83 @@
+import pytest
+from httpx import AsyncClient
+import io
+import uuid
+from backend.documents.schemas import ConfidenceLevel
+
+async def get_auth_headers(client: AsyncClient, email: str) -> dict:
+    payload = {"email": email, "password": "securepassword123"}
+    await client.post("/api/v1/auth/register", json=payload)
+    login_resp = await client.post("/api/v1/auth/login", data={"username": email, "password": "securepassword123"})
+    token = login_resp.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+@pytest.mark.asyncio
+async def test_upload_confidence_evaluations_and_draft_update(client: AsyncClient):
+    headers = await get_auth_headers(client, "upload@example.com")
+    
+    # Create career session
+    session_resp = await client.post("/api/v1/career-sessions", json={"goal": "IMPROVE_CV"}, headers=headers)
+    session_id = session_resp.json()["id"]
+
+    # Emulate PDF file upload stream
+    file_payload = {"file": ("my_resume.pdf", io.BytesIO(b"%PDF-1.4 dummy pdf content"), "application/pdf")}
+    upload_resp = await client.post(
+        f"/api/v1/career-sessions/{session_id}/documents/upload",
+        files=file_payload,
+        headers=headers
+    )
+    assert upload_resp.status_code == 201
+    
+    # Fetch draft and check parsed values and confidence parameters
+    draft_resp = await client.get(f"/api/v1/career-sessions/{session_id}/cv-draft", headers=headers)
+    assert draft_resp.status_code == 200
+    draft_data = draft_resp.json()
+    assert draft_data["content"]["personal_info"]["name"]["value"] == "John Doe"
+    assert draft_data["content"]["personal_info"]["name"]["confidence"] == ConfidenceLevel.HIGH.value
+    assert draft_data["content"]["headline"]["confidence"] == ConfidenceLevel.MEDIUM.value
+    assert draft_data["content"]["summary"]["confidence"] == ConfidenceLevel.LOW.value
+    
+    # Update draft manually
+    update_payload = {
+        "content": {
+            "personal_info": {"name": {"value": "Jane Doe", "confidence": "HIGH"}}
+        }
+    }
+    update_resp = await client.put(f"/api/v1/career-sessions/{session_id}/cv-draft", json=update_payload, headers=headers)
+    assert update_resp.status_code == 200
+    assert update_resp.json()["content"]["personal_info"]["name"]["value"] == "Jane Doe"
+
+@pytest.mark.asyncio
+async def test_invalid_file_extension_rejection(client: AsyncClient):
+    headers = await get_auth_headers(client, "invalid_file@example.com")
+    session_resp = await client.post("/api/v1/career-sessions", json={"goal": "IMPROVE_CV"}, headers=headers)
+    session_id = session_resp.json()["id"]
+
+    # Emulate TXT file upload (not allowed)
+    file_payload = {"file": ("unsupported.txt", io.BytesIO(b"unsupported content"), "text/plain")}
+    upload_resp = await client.post(
+        f"/api/v1/career-sessions/{session_id}/documents/upload",
+        files=file_payload,
+        headers=headers
+    )
+    assert upload_resp.status_code == 400
+    assert "Only .pdf and .docx" in upload_resp.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_session_ownership_enforcement_on_uploads(client: AsyncClient):
+    headers_owner = await get_auth_headers(client, "owner_upload@example.com")
+    headers_attacker = await get_auth_headers(client, "attacker_upload@example.com")
+    
+    # Owner creates session
+    session_resp = await client.post("/api/v1/career-sessions", json={"goal": "IMPROVE_CV"}, headers=headers_owner)
+    session_id = session_resp.json()["id"]
+
+    # Attacker attempts to upload file to owner's session
+    file_payload = {"file": ("attacker_resume.pdf", io.BytesIO(b"%PDF-1.4 dummy pdf"), "application/pdf")}
+    upload_resp = await client.post(
+        f"/api/v1/career-sessions/{session_id}/documents/upload",
+        files=file_payload,
+        headers=headers_attacker
+    )
+    assert upload_resp.status_code == 403
+    assert "Not authorized" in upload_resp.json()["detail"]

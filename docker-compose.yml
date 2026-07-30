@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: rolecraft-db
+    environment:
+      POSTGRES_USER: rolecraft
+      POSTGRES_PASSWORD: rolecraft_password
+      POSTGRES_DB: rolecraft
+    ports:
+      - "5433:5432"
+    volumes:
+      - rolecraft_pgdata:/var/lib/postgresql/data
+
+volumes:
+  rolecraft_pgdata:
