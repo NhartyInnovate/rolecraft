@@ -32,7 +32,7 @@ def extract_text_from_pdf(filepath: str) -> str:
         return text
     except Exception as e:
         if "dummy pdf" in filepath or settings.ENVIRONMENT == "dev" or "mock-key" in settings.OPENAI_API_KEY:
-            return "John Doe mock extracted CV profile text"
+            return "name: John Doe\nemail: john@example.com\nSoftware Engineer"
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Failed to read PDF file content. Please ensure the document is not password-protected and try again."

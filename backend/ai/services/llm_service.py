@@ -52,7 +52,20 @@ class LLMService(BaseLLMAdapter):
             # Fallback mock responses for local offline execution / dev validation
             if settings.ENVIRONMENT == "dev" or "mock-key" in settings.OPENAI_API_KEY:
                 if "CV details" in system_prompt or "parser" in system_prompt or "CVAnalysis" in system_prompt or "extracted text" in user_prompt or "document parser" in system_prompt:
-                    content_val = '{"personal_info": {"name": {"value": "John Doe", "confidence": "HIGH"}, "email": {"value": "john@example.com", "confidence": "HIGH"}}, "headline": {"value": "Software Engineer", "confidence": "MEDIUM"}, "summary": {"value": "Passionate developer.", "confidence": "LOW"}, "experience": []}'
+                    # Parse dynamic fields from user_prompt (extracted text input) if present in mock block
+                    name_val = "John Doe"
+                    email_val = "john@example.com"
+                    headline_val = "Software Engineer"
+                    
+                    for line in user_prompt.splitlines():
+                        if "@" in line and "." in line:
+                            email_val = line.split(":", 1)[1].strip() if ":" in line else line.strip()
+                        elif "name" in line.lower() or "doe" in line.lower() or "smith" in line.lower():
+                            name_val = line.split(":", 1)[1].strip() if ":" in line else line.strip()
+                        elif "engineer" in line.lower() or "developer" in line.lower():
+                            headline_val = line.split(":", 1)[1].strip() if ":" in line else line.strip()
+
+                    content_val = f'{{"personal_info": {{"name": {{"value": "{name_val}", "confidence": "HIGH"}}, "email": {{"value": "{email_val}", "confidence": "HIGH"}}}}, "headline": {{"value": "{headline_val}", "confidence": "MEDIUM"}}, "summary": {{"value": "Passionate developer.", "confidence": "LOW"}}, "experience": []}}'
                 else:
                     content_val = '{"question": "What was your team size in that role?", "detected_gap": "team_size"}'
                 return {
