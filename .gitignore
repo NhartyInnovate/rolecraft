@@ -17,6 +17,7 @@ dist/
 
 # Uploads
 storage/uploads/
+storage/exports/
 
 # IDE
 .vscode/
