@@ -47,6 +47,30 @@ async def test_upload_confidence_evaluations_and_draft_update(client: AsyncClien
     assert update_resp.status_code == 200
     assert update_resp.json()["content"]["personal_info"]["name"]["value"] == "Jane Doe"
 
+    # Option A validation: Re-uploading another CV to the same career session (should overwrite)
+    file_payload_2 = {"file": ("my_resume_updated.pdf", io.BytesIO(b"%PDF-1.4 dummy pdf update"), "application/pdf")}
+    upload_resp_2 = await client.post(
+        f"/api/v1/career-sessions/{session_id}/documents/upload",
+        files=file_payload_2,
+        headers=headers
+    )
+    assert upload_resp_2.status_code == 201
+    
+    # Confirm draft populated name changes relative to extracted regex simulation
+    draft_resp_2 = await client.get(f"/api/v1/career-sessions/{session_id}/cv-draft", headers=headers)
+    assert draft_resp_2.json()["content"]["personal_info"]["name"]["value"] == "John Doe"
+
+    # Export document check
+    export_resp = await client.post(f"/api/v1/career-sessions/{session_id}/exports/cv?file_type=PDF", headers=headers)
+    assert export_resp.status_code == 201
+    export_id = export_resp.json()["id"]
+
+    # Download document check (verify file integrity and header types)
+    dl_resp = await client.get(f"/api/v1/career-sessions/{session_id}/exports/{export_id}", headers=headers)
+    assert dl_resp.status_code == 200
+    assert dl_resp.headers["content-type"] == "application/pdf"
+    assert b"%PDF-1.4" in dl_resp.content
+
 @pytest.mark.asyncio
 async def test_invalid_file_extension_rejection(client: AsyncClient):
     headers = await get_auth_headers(client, "invalid_file@example.com")

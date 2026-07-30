@@ -74,7 +74,8 @@ async def download_file_export(
         raise HTTPException(status_code=404, detail="Physical file missing from storage.")
         
     filename = f"CV_Export_{session_id}{os.path.splitext(db_export.storage_path)[1]}"
-    return FileResponse(db_export.storage_path, filename=filename)
+    media_type = "application/pdf" if db_export.file_type.upper() == "PDF" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    return FileResponse(db_export.storage_path, filename=filename, media_type=media_type)
 
 # Helper select import since SQL dependencies are dynamic
 from sqlalchemy import select
