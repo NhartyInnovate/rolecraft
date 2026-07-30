@@ -1,5 +1,6 @@
 import os
 import uuid
+import json
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi import HTTPException, status, UploadFile
@@ -112,10 +113,13 @@ async def process_file_upload(
     await db.refresh(db_cv)
     
     # Eagerly trigger AI analysis parsing matching confidence schemas
+    print(f"[DEBUG UPLOAD] First 200 chars of extracted text: {repr(extracted_text[:200])}")
     analysis_results = await analysis_service.analyze_cv_text(extracted_text)
+    print(f"[DEBUG UPLOAD] Parsed output: {json.dumps(analysis_results)}")
     
     # Create or update CVDraft with analysis results
-    await save_or_update_cv_draft(db, user_id, session_id, analysis_results)
+    saved_draft = await save_or_update_cv_draft(db, user_id, session_id, analysis_results)
+    print(f"[DEBUG UPLOAD] Final JSON written to cv_drafts: {json.dumps(saved_draft.content)}")
     
     return db_cv
 
