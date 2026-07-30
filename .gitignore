@@ -1,0 +1,23 @@
+# Environment
+.env
+.env.*
+
+# Virtual environment
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Packaging
+*.egg-info/
+build/
+dist/
+
+# Uploads
+storage/uploads/
+
+# IDE
+.vscode/
+.idea/
