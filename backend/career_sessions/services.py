@@ -50,10 +50,8 @@ async def list_user_sessions(db: AsyncSession, user_id: uuid.UUID) -> list[Caree
     result = await db.execute(
         select(CareerSession)
         .where(CareerSession.user_id == user_id)
-        .order_on(CareerSession.created_at.desc()) if hasattr(CareerSession, "created_at") else select(CareerSession).where(CareerSession.user_id == user_id)
+        .order_by(CareerSession.created_at.desc())
     )
-    # Simple order by fallback
-    result = await db.execute(select(CareerSession).where(CareerSession.user_id == user_id))
     return list(result.scalars().all())
 
 async def update_session_status(

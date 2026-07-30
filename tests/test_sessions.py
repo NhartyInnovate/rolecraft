@@ -96,3 +96,29 @@ async def test_session_ownership_enforcement(client: AsyncClient):
     # Attacker attempts to delete the session
     del_resp = await client.delete(f"/api/v1/career-sessions/{session_id}", headers=headers_attacker)
     assert del_resp.status_code == 403
+
+@pytest.mark.asyncio
+async def test_list_and_delete_user_sessions(client: AsyncClient):
+    headers = await get_auth_headers(client, "list_sessions@example.com")
+
+    # Create two sessions
+    await client.post("/api/v1/career-sessions", json={"goal": "CREATE_CV", "title": "S1"}, headers=headers)
+    await client.post("/api/v1/career-sessions", json={"goal": "IMPROVE_CV", "title": "S2"}, headers=headers)
+
+    # List sessions (tests list_user_sessions and order_by query logic)
+    list_resp = await client.get("/api/v1/career-sessions", headers=headers)
+    assert list_resp.status_code == 200
+    sessions = list_resp.json()
+    assert len(sessions) >= 2
+    # Ensure ordered by created_at desc (S2 created after S1)
+    assert sessions[0]["title"] == "S2"
+    assert sessions[1]["title"] == "S1"
+
+    # Delete session
+    delete_id = sessions[0]["id"]
+    del_resp = await client.delete(f"/api/v1/career-sessions/{delete_id}", headers=headers)
+    assert del_resp.status_code == 204
+
+    # Verify deleted
+    list_resp = await client.get("/api/v1/career-sessions", headers=headers)
+    assert not any(s["id"] == delete_id for s in list_resp.json())
