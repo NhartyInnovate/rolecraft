@@ -181,3 +181,34 @@ async def test_extraction_provider_unavailable(client: AsyncClient, mocker):
     )
     assert upload_resp.status_code == 503
     assert "unavailable" in upload_resp.json()["detail"].lower()
+
+@pytest.mark.asyncio
+async def test_flexible_date_formats(client: AsyncClient, mocker):
+    headers = await get_auth_headers(client, "flex_date@example.com")
+    session_resp = await client.post("/api/v1/career-sessions", json={"goal": "IMPROVE_CV"}, headers=headers)
+    session_id = session_resp.json()["id"]
+
+    # Mock the LLMService response to return valid JSON but with realistic loose résumé dates (Present, 2025, Oct 2022)
+    mocker.patch(
+        "backend.ai.services.llm_service.LLMService.generate_chat_response",
+        return_value={
+            "content": '{"personal_info": {"name": {"value": "John Doe", "confidence": 0.9}, "email": {"value": "john@example.com", "confidence": 0.9}, "phone": {"value": null, "confidence": 0.0}, "location": {"value": null, "confidence": 0.0}}, "headline": {"value": "Software Engineer", "confidence": 0.9}, "summary": {"value": null, "confidence": 0.0}, "experience": [{"company": {"value": "Tech Corp", "confidence": 0.9}, "role": {"value": "Backend Dev", "confidence": 0.9}, "start_date": {"value": "Oct 2022", "confidence": 0.9}, "end_date": {"value": "Present", "confidence": 0.9}}], "education": [], "skills": [], "projects": [], "certifications": []}',
+            "model_used": "mock-gpt-model",
+            "prompt_tokens": 100,
+            "completion_tokens": 50,
+            "finish_reason": "stop",
+            "provider_name": "MockProvider"
+        }
+    )
+
+    file_payload = {"file": ("my_resume.pdf", io.BytesIO(b"%PDF-1.4 dummy pdf"), "application/pdf")}
+    upload_resp = await client.post(
+        f"/api/v1/career-sessions/{session_id}/documents/upload",
+        files=file_payload,
+        headers=headers
+    )
+    assert upload_resp.status_code == 201
+    upload_data = upload_resp.json()
+    assert upload_data["status"] == "pending_review"
+    assert upload_data["draft"]["experience"][0]["start_date"]["value"] == "Oct 2022"
+    assert upload_data["draft"]["experience"][0]["end_date"]["value"] == "Present"

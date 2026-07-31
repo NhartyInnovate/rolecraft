@@ -71,6 +71,10 @@ class LLMService(BaseLLMAdapter):
             # Request schema enforcement if structure is defined
             if response_schema:
                 kwargs["response_format"] = {"type": "json_object"}
+                # Ensure the word "json" is present in the prompt to comply with OpenAI API rules
+                all_prompt_text = (system_prompt + " " + user_prompt).lower()
+                if "json" not in all_prompt_text:
+                    messages[0]["content"] += "\n\nResponse must be a valid JSON object."
 
             response = await self.client.chat.completions.create(**kwargs)
             

@@ -60,9 +60,16 @@ class DateFieldModel(ExtractedFieldModel):
     def validate_date(cls, v: Optional[str]) -> Optional[str]:
         if v:
             v_clean = v.strip()
-            if not re.match(r'^\d{4}-\d{2}-\d{2}$', v_clean):
-                raise ValueError("Date must be in YYYY-MM-DD format")
-            return v_clean
+            # 1. Present / Current indicator check
+            if re.match(r'^(Present|Current|Now|Ongoing)$', v_clean, re.IGNORECASE):
+                return "Present"
+            # 2. Standard numeric layouts (YYYY, YYYY-MM, YYYY-MM-DD)
+            if re.match(r'^\d{4}(?:-\d{2}){0,2}$', v_clean):
+                return v_clean
+            # 3. Standard textual layout (Month YYYY, e.g. Oct 2022)
+            if re.match(r'^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4}$', v_clean, re.IGNORECASE):
+                return v_clean
+            raise ValueError("Invalid date format. Expected YYYY, YYYY-MM, YYYY-MM-DD, Month YYYY, or Present.")
         return v
 
 class WorkExperienceModel(BaseModel):

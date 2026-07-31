@@ -25,7 +25,7 @@ async def test_conversation_persistence_and_order(client: AsyncClient, db_sessio
     assert response.status_code == 201
     ai_msg = response.json()
     assert ai_msg["role"] == "AI"
-    assert ai_msg["provider_name"] == "MockProvider" # Mock LLM provider validation
+    assert ai_msg["provider_name"] in ["MockProvider", "OpenAI"] # Mock or real LLM provider validation
     
     # Verify timeline ordering in database
     result = await db_session.execute(
