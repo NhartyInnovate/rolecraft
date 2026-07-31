@@ -37,3 +37,11 @@ class CareerSessionResponse(CareerSessionBase):
 
     class Config:
         from_attributes = True
+
+class CareerSessionStatusResponse(BaseModel):
+    document_uploaded: bool
+    pending_review: bool
+    draft_confirmed: bool
+    cv_generated: bool
+    cover_letter_generated: bool
+    completion_percentage: int

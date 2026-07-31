@@ -7,14 +7,16 @@ from backend.users.models import User
 from backend.career_sessions.schemas import (
     CareerSessionResponse,
     CareerSessionCreate,
-    CareerSessionUpdateStatus
+    CareerSessionUpdateStatus,
+    CareerSessionStatusResponse
 )
 from backend.career_sessions.services import (
     create_session,
     get_session_by_id,
     list_user_sessions,
     update_session_status,
-    delete_session
+    delete_session,
+    get_session_workflow_status
 )
 
 router = APIRouter(prefix="/career-sessions", tags=["Career Sessions"])
@@ -58,3 +60,11 @@ async def remove_session(
     db: AsyncSession = Depends(get_db)
 ):
     await delete_session(db, current_user.id, session_id)
+
+@router.get("/{session_id}/status", response_model=CareerSessionStatusResponse)
+async def get_session_status(
+    session_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    return await get_session_workflow_status(db, current_user.id, session_id)

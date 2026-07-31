@@ -122,3 +122,58 @@ async def test_list_and_delete_user_sessions(client: AsyncClient):
     # Verify deleted
     list_resp = await client.get("/api/v1/career-sessions", headers=headers)
     assert not any(s["id"] == delete_id for s in list_resp.json())
+
+@pytest.mark.asyncio
+async def test_career_session_status_workflow(client: AsyncClient):
+    headers = await get_auth_headers(client, "workflow_status@example.com")
+    
+    # 1. Create career session
+    session_resp = await client.post("/api/v1/career-sessions", json={"goal": "IMPROVE_CV"}, headers=headers)
+    session_id = session_resp.json()["id"]
+    
+    # 2. Check initial status
+    status_resp = await client.get(f"/api/v1/career-sessions/{session_id}/status", headers=headers)
+    assert status_resp.status_code == 200
+    status_data = status_resp.json()
+    assert status_data["document_uploaded"] is False
+    assert status_data["pending_review"] is False
+    assert status_data["draft_confirmed"] is False
+    assert status_data["completion_percentage"] == 0
+
+    # 3. Upload document (transient pending review)
+    import io
+    file_payload = {"file": ("my_resume.pdf", io.BytesIO(b"%PDF-1.4 dummy pdf"), "application/pdf")}
+    upload_resp = await client.post(
+        f"/api/v1/career-sessions/{session_id}/documents/upload",
+        files=file_payload,
+        headers=headers
+    )
+    assert upload_resp.status_code == 201
+    
+    # Verify status changes to uploaded and pending review, progress is 20%
+    status_resp = await client.get(f"/api/v1/career-sessions/{session_id}/status", headers=headers)
+    status_data = status_resp.json()
+    assert status_data["document_uploaded"] is True
+    assert status_data["pending_review"] is True
+    assert status_data["draft_confirmed"] is False
+    assert status_data["completion_percentage"] == 20
+
+    # 4. Confirm the draft
+    confirm_payload = {
+        "document_type": "cv",
+        "content": upload_resp.json()["draft"]
+    }
+    confirm_resp = await client.post(
+        f"/api/v1/career-sessions/{session_id}/documents/confirm",
+        json=confirm_payload,
+        headers=headers
+    )
+    assert confirm_resp.status_code == 200
+
+    # Verify status changes to confirmed and pending_review is False, progress is 40%
+    status_resp = await client.get(f"/api/v1/career-sessions/{session_id}/status", headers=headers)
+    status_data = status_resp.json()
+    assert status_data["document_uploaded"] is True
+    assert status_data["pending_review"] is False
+    assert status_data["draft_confirmed"] is True
+    assert status_data["completion_percentage"] == 40

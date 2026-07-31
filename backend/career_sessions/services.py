@@ -95,3 +95,49 @@ async def delete_session(db: AsyncSession, user_id: uuid.UUID, session_id: uuid.
     # All dependent child relations will delete via cascading configurations
     await db.delete(db_session)
     await db.commit()
+
+async def get_session_workflow_status(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    session_id: uuid.UUID
+) -> dict:
+    from backend.documents.models import UploadedCV, CVDraft, CoverLetterDraft, Export
+    
+    # Enforce existence and ownership using get_session_by_id
+    await get_session_by_id(db, user_id, session_id)
+
+    # Check document uploaded
+    cv_res = await db.execute(select(UploadedCV).where(UploadedCV.career_session_id == session_id))
+    has_cv = cv_res.scalar_one_or_none() is not None
+
+    # Check CV draft confirmed
+    draft_res = await db.execute(select(CVDraft).where(CVDraft.career_session_id == session_id))
+    has_draft = draft_res.scalar_one_or_none() is not None
+
+    # Check Cover Letter generated
+    cl_res = await db.execute(select(CoverLetterDraft).where(CoverLetterDraft.career_session_id == session_id))
+    has_cl = cl_res.scalar_one_or_none() is not None
+
+    # Check Export generated
+    exp_res = await db.execute(select(Export).where(Export.career_session_id == session_id))
+    has_export = exp_res.scalar_one_or_none() is not None
+
+    # Calculate completion percentage
+    completion_percentage = 0
+    if has_cv:
+        completion_percentage += 20
+    if has_draft:
+        completion_percentage += 20
+    if has_cl:
+        completion_percentage += 30
+    if has_export:
+        completion_percentage += 30
+
+    return {
+        "document_uploaded": has_cv,
+        "pending_review": has_cv and not has_draft,
+        "draft_confirmed": has_draft,
+        "cv_generated": has_export,
+        "cover_letter_generated": has_cl,
+        "completion_percentage": completion_percentage
+    }
