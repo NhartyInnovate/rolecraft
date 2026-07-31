@@ -23,6 +23,14 @@ class CVDraftBase(BaseModel):
 class CVDraftUpdate(CVDraftBase):
     pass
 
+class CVPendingReviewResponse(BaseModel):
+    status: str = "pending_review"
+    draft: dict
+
+class DocumentConfirmRequest(BaseModel):
+    document_type: str
+    content: dict
+
 class CVDraftResponse(CVDraftBase):
     id: uuid.UUID
     career_session_id: uuid.UUID

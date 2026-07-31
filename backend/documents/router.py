@@ -6,17 +6,21 @@ import os
 from backend.core.db import get_db
 from backend.auth.dependencies import get_current_user
 from backend.users.models import User
-from backend.documents.schemas import UploadedCVResponse, CVDraftResponse, CVDraftUpdate, ExportResponse
+from backend.documents.schemas import (
+    UploadedCVResponse, CVDraftResponse, CVDraftUpdate, ExportResponse,
+    CVPendingReviewResponse, DocumentConfirmRequest
+)
 from backend.documents.services import (
     process_file_upload,
     get_cv_draft,
     save_or_update_cv_draft,
-    compile_cv_export
+    compile_cv_export,
+    confirm_document_draft
 )
 
 router = APIRouter(prefix="/career-sessions", tags=["Documents & Exports"])
 
-@router.post("/{session_id}/documents/upload", response_model=UploadedCVResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{session_id}/documents/upload", response_model=CVPendingReviewResponse, status_code=status.HTTP_201_CREATED)
 async def upload_cv_document(
     session_id: uuid.UUID,
     file: UploadFile = File(...),
@@ -24,6 +28,15 @@ async def upload_cv_document(
     db: AsyncSession = Depends(get_db)
 ):
     return await process_file_upload(db, current_user.id, session_id, file)
+
+@router.post("/{session_id}/documents/confirm", response_model=CVDraftResponse)
+async def confirm_session_document_draft(
+    session_id: uuid.UUID,
+    confirm_in: DocumentConfirmRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    return await confirm_document_draft(db, current_user.id, session_id, confirm_in.document_type, confirm_in.content)
 
 @router.get("/{session_id}/cv-draft", response_model=CVDraftResponse)
 async def get_session_cv_draft(

@@ -113,15 +113,45 @@ async def process_file_upload(
     await db.refresh(db_cv)
     
     # Eagerly trigger AI analysis parsing matching confidence schemas
-    print(f"[DEBUG UPLOAD] First 200 chars of extracted text: {repr(extracted_text[:200])}")
-    analysis_results = await analysis_service.analyze_cv_text(extracted_text)
-    print(f"[DEBUG UPLOAD] Parsed output: {json.dumps(analysis_results)}")
+    analysis_results = await analysis_service.extract_document(document_type="cv", text=extracted_text, version="v1")
     
-    # Create or update CVDraft with analysis results
-    saved_draft = await save_or_update_cv_draft(db, user_id, session_id, analysis_results)
-    print(f"[DEBUG UPLOAD] Final JSON written to cv_drafts: {json.dumps(saved_draft.content)}")
+    return {
+        "status": "pending_review",
+        "draft": analysis_results
+    }
+
+async def confirm_document_draft(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    session_id: uuid.UUID,
+    document_type: str,
+    content: dict
+) -> CVDraft:
+    from backend.documents.analysis_service import DOCUMENT_SCHEMAS
+    if document_type not in DOCUMENT_SCHEMAS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported document confirmation type: {document_type}"
+        )
     
-    return db_cv
+    # Validation step 2: Ensure user edits remain structurally sound
+    validator_cls = DOCUMENT_SCHEMAS[document_type]
+    try:
+        validated_model = validator_cls(**content)
+        validated_data = validated_model.model_dump()
+    except Exception as val_err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Confirmation validation failed: {str(val_err)}"
+        )
+        
+    if document_type == "cv":
+        return await save_or_update_cv_draft(db, user_id, session_id, validated_data)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Generic document confirmation not implemented for: {document_type}"
+        )
 
 async def get_cv_draft(db: AsyncSession, user_id: uuid.UUID, session_id: uuid.UUID) -> CVDraft:
     await get_session_by_id(db, user_id, session_id)
