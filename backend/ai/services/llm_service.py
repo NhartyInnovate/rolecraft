@@ -24,12 +24,13 @@ class LLMService(BaseLLMAdapter):
             messages.append({"role": msg["role"], "content": msg["content"]})
         messages.append({"role": "user", "content": user_prompt})
 
-        # Check if environment is configured for mock execution to bypass actual API request entirely
-        if settings.ENVIRONMENT == "dev" or "mock-key" in settings.OPENAI_API_KEY:
+        # Check if API key is unconfigured or has the mock value to determine if we bypass actual API
+        is_mock_key = not settings.OPENAI_API_KEY or "mock-key" in settings.OPENAI_API_KEY
+        if is_mock_key:
             import sys
             is_testing = "pytest" in sys.modules or "unittest" in sys.modules
             if not is_testing:
-                raise ConnectionError("LLM provider API key is not configured or mock key was supplied in development.")
+                raise ConnectionError("LLM provider API key is not configured or mock key was supplied.")
                 
             if "CV details" in system_prompt or "parser" in system_prompt or "CVAnalysis" in system_prompt or "extracted text" in user_prompt or "document parser" in system_prompt:
                 # Collapse repeated whitespace/newlines to normalize text layout
