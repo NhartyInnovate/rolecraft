@@ -109,6 +109,12 @@ class CVExtractionSchema(BaseModel):
         v["email"] = EmailFieldModel(**v["email"]).model_dump()
         v["phone"] = PhoneFieldModel(**v["phone"]).model_dump()
         v["location"] = ExtractedFieldModel(**v["location"]).model_dump()
+
+        # Validate optional link keys if provided
+        optional_keys = {"linkedin_url", "github_url", "portfolio_url", "personal_website"}
+        for key in optional_keys:
+            if key in v and v[key] is not None:
+                v[key] = ExtractedFieldModel(**v[key]).model_dump()
         return v
 
 # Schema Registry mapping document types to Pydantic validators

@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 import uuid
 
 from backend.profiles.models import (
@@ -72,10 +72,78 @@ async def update_profile(db: AsyncSession, user_id: uuid.UUID, profile_in: Profe
     profile.headline = profile_in.headline
     profile.summary = profile_in.summary
     profile.years_of_experience = profile_in.years_of_experience
+    profile.full_name = profile_in.full_name
+    profile.phone = profile_in.phone
+    profile.location = profile_in.location
+    profile.linkedin_url = profile_in.linkedin_url
+    profile.github_url = profile_in.github_url
+    profile.portfolio_url = profile_in.portfolio_url
+    profile.personal_website = profile_in.personal_website
+    profile.profile_photo_url = profile_in.profile_photo_url
     
     await db.commit()
     await db.refresh(profile)
     return profile
+
+async def sync_from_confirmed_cv(db: AsyncSession, user_id: uuid.UUID, cv_content: dict) -> None:
+    profile = await get_or_create_profile(db, user_id)
+    personal_info = cv_content.get("personal_info", {})
+    
+    # 1. full_name
+    extracted_name = personal_info.get("name", {}).get("value") if isinstance(personal_info.get("name"), dict) else personal_info.get("name")
+    if extracted_name and (not profile.full_name or profile.full_name.strip() == ""):
+        profile.full_name = extracted_name.strip()
+        
+    # 2. headline
+    extracted_headline = cv_content.get("headline", {}).get("value") if isinstance(cv_content.get("headline"), dict) else cv_content.get("headline")
+    if extracted_headline and (not profile.headline or profile.headline.strip() == ""):
+        profile.headline = extracted_headline.strip()
+        
+    # 3. phone
+    extracted_phone = personal_info.get("phone", {}).get("value") if isinstance(personal_info.get("phone"), dict) else personal_info.get("phone")
+    if extracted_phone and (not profile.phone or profile.phone.strip() == ""):
+        profile.phone = extracted_phone.strip()
+        
+    # 4. location
+    extracted_location = personal_info.get("location", {}).get("value") if isinstance(personal_info.get("location"), dict) else personal_info.get("location")
+    if extracted_location and (not profile.location or profile.location.strip() == ""):
+        profile.location = extracted_location.strip()
+        
+    # 5. linkedin_url
+    extracted_linkedin = personal_info.get("linkedin_url", {}).get("value") if isinstance(personal_info.get("linkedin_url"), dict) else personal_info.get("linkedin_url")
+    if not extracted_linkedin:
+        extracted_linkedin = personal_info.get("linkedin", {}).get("value") if isinstance(personal_info.get("linkedin"), dict) else personal_info.get("linkedin")
+    if extracted_linkedin and (not profile.linkedin_url or profile.linkedin_url.strip() == ""):
+        profile.linkedin_url = extracted_linkedin.strip()
+        
+    # 6. github_url
+    extracted_github = personal_info.get("github_url", {}).get("value") if isinstance(personal_info.get("github_url"), dict) else personal_info.get("github_url")
+    if not extracted_github:
+        extracted_github = personal_info.get("github", {}).get("value") if isinstance(personal_info.get("github"), dict) else personal_info.get("github")
+    if extracted_github and (not profile.github_url or profile.github_url.strip() == ""):
+        profile.github_url = extracted_github.strip()
+        
+    # 7. portfolio_url
+    extracted_portfolio = personal_info.get("portfolio_url", {}).get("value") if isinstance(personal_info.get("portfolio_url"), dict) else personal_info.get("portfolio_url")
+    if not extracted_portfolio:
+        extracted_portfolio = personal_info.get("portfolio", {}).get("value") if isinstance(personal_info.get("portfolio"), dict) else personal_info.get("portfolio")
+    if extracted_portfolio and (not profile.portfolio_url or profile.portfolio_url.strip() == ""):
+        profile.portfolio_url = extracted_portfolio.strip()
+        
+    # 8. personal_website
+    extracted_website = personal_info.get("personal_website", {}).get("value") if isinstance(personal_info.get("personal_website"), dict) else personal_info.get("personal_website")
+    if not extracted_website:
+        extracted_website = personal_info.get("website_url", {}).get("value") if isinstance(personal_info.get("website_url"), dict) else personal_info.get("website_url")
+    if not extracted_website:
+        extracted_website = personal_info.get("website", {}).get("value") if isinstance(personal_info.get("website"), dict) else personal_info.get("website")
+    if extracted_website and (not profile.personal_website or profile.personal_website.strip() == ""):
+        profile.personal_website = extracted_website.strip()
+        
+    # Update synchronization timestamp
+    profile.last_synced_from_cv_at = datetime.now(timezone.utc)
+    
+    await db.commit()
+    await db.refresh(profile)
 
 # Helper function to load profile and enforce user ownership validation
 async def get_profile_and_verify_ownership(db: AsyncSession, profile_id: uuid.UUID, user_id: uuid.UUID) -> ProfessionalProfile:

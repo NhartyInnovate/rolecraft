@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, HttpUrl
-from datetime import date
+from datetime import date, datetime
 import uuid
 
 # Base Schemas
@@ -80,11 +80,18 @@ class ProfessionalLinkResponse(ProfessionalLinkBase):
     class Config:
         from_attributes = True
 
-# Profile Schemas
 class ProfessionalProfileBase(BaseModel):
     headline: str | None = Field(None, max_length=255)
     summary: str | None = Field(None, max_length=2000)
     years_of_experience: int | None = Field(None, ge=0)
+    full_name: str | None = Field(None, max_length=255)
+    phone: str | None = Field(None, max_length=50)
+    location: str | None = Field(None, max_length=255)
+    linkedin_url: str | None = Field(None, max_length=1024)
+    github_url: str | None = Field(None, max_length=1024)
+    portfolio_url: str | None = Field(None, max_length=1024)
+    personal_website: str | None = Field(None, max_length=1024)
+    profile_photo_url: str | None = Field(None, max_length=1024)
 
 class ProfessionalProfileUpdate(ProfessionalProfileBase):
     pass
@@ -92,6 +99,8 @@ class ProfessionalProfileUpdate(ProfessionalProfileBase):
 class ProfessionalProfileResponse(ProfessionalProfileBase):
     id: uuid.UUID
     user_id: uuid.UUID
+    email: str | None = None
+    last_synced_from_cv_at: datetime | None = None
     work_experiences: list[WorkExperienceResponse] = []
     educations: list[EducationResponse] = []
     skills: list[SkillResponse] = []

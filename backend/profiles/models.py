@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, Integer, ForeignKey, Date
+from sqlalchemy import String, Integer, ForeignKey, Date, DateTime
 from backend.core.db import Base, TimestampMixin
 
 class ProfessionalProfile(Base, TimestampMixin):
@@ -13,6 +13,17 @@ class ProfessionalProfile(Base, TimestampMixin):
     summary: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     years_of_experience: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # Sync fields
+    full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    linkedin_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    github_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    portfolio_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    personal_website: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    profile_photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    last_synced_from_cv_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # Relationships
     user = relationship("User", back_populates="profile")
     work_experiences = relationship("WorkExperience", back_populates="profile", cascade="all, delete-orphan")
@@ -20,6 +31,10 @@ class ProfessionalProfile(Base, TimestampMixin):
     skills = relationship("Skill", back_populates="profile", cascade="all, delete-orphan")
     certifications = relationship("Certification", back_populates="profile", cascade="all, delete-orphan")
     links = relationship("ProfessionalLink", back_populates="profile", cascade="all, delete-orphan")
+
+    @property
+    def email(self) -> str | None:
+        return self.user.email if self.user else None
 
 class WorkExperience(Base, TimestampMixin):
     __tablename__ = "work_experiences"

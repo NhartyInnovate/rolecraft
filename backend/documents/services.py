@@ -146,7 +146,10 @@ async def confirm_document_draft(
         )
         
     if document_type == "cv":
-        return await save_or_update_cv_draft(db, user_id, session_id, validated_data)
+        draft = await save_or_update_cv_draft(db, user_id, session_id, validated_data)
+        from backend.profiles.services import sync_from_confirmed_cv
+        await sync_from_confirmed_cv(db, user_id, validated_data)
+        return draft
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
